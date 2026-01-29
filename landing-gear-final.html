@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Landing Gear - Hazard Identification Module</title>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Rajdhani', sans-serif;
+            background: linear-gradient(135deg, #0a1628 0%, #0d2137 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 15px; }
+        .header {
+            text-align: center;
+            padding: 15px;
+            border-bottom: 2px solid #1e5a96;
+            margin-bottom: 15px;
+        }
+        .header h1 {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: clamp(1.1rem, 3vw, 1.6rem);
+            color: #4da6ff;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 0 0 20px rgba(77, 166, 255, 0.5);
+        }
+        .header p { margin-top: 5px; color: #7ab8ed; font-size: 0.9rem; }
+        .aircraft-badge {
+            display: inline-block;
+            background: rgba(77, 166, 255, 0.2);
+            border: 1px solid #4da6ff;
+            border-radius: 20px;
+            padding: 4px 12px;
+            margin-top: 8px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.8rem;
+            color: #4da6ff;
+        }
+        .instructions {
+            background: rgba(30, 90, 150, 0.15);
+            border: 1px solid #1e5a96;
+            border-radius: 8px;
+            padding: 10px 15px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        .instructions p { color: #a0c4e8; font-size: 0.85rem; }
+        .controls-hint {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+        }
+        .hint-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.8rem;
+            color: #7ab8ed;
+        }
+        .hint-icon {
+            width: 22px;
+            height: 22px;
+            background: rgba(77, 166, 255, 0.2);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+        }
+        .viewer-container {
+            position: relative;
+            width: 100%;
+            height: 450px;
+            background: rgba(10, 22, 40, 0.9);
+            border: 2px solid #1e5a96;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+        #canvas3d { width: 100%; height: 100%; display: block; }
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #4da6ff;
+            font-family: 'Share Tech Mono', monospace;
+        }
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(77, 166, 255, 0.2);
+            border-top-color: #4da6ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .part-label-3d {
+            position: absolute;
+            background: rgba(10, 30, 50, 0.95);
+            border: 1px solid #4da6ff;
+            border-radius: 6px;
+            padding: 8px 12px;
+            pointer-events: none;
+            display: none;
+            z-index: 100;
+            max-width: 200px;
+        }
+        .part-label-3d h4 {
+            font-family: 'Share Tech Mono', monospace;
+            color: #4da6ff;
+            font-size: 0.85rem;
+            margin-bottom: 4px;
+        }
+        .part-label-3d p { color: #a0c4e8; font-size: 0.75rem; }
+        .zoom-controls {
+            position: absolute;
+            bottom: 15px;
+            right: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            z-index: 50;
+        }
+        .zoom-btn {
+            width: 36px;
+            height: 36px;
+            background: rgba(10, 30, 50, 0.9);
+            border: 1px solid #4da6ff;
+            border-radius: 6px;
+            color: #4da6ff;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .zoom-btn:hover { background: rgba(77, 166, 255, 0.2); }
+        .reset-btn {
+            position: absolute;
+            bottom: 15px;
+            left: 15px;
+            background: rgba(10, 30, 50, 0.9);
+            border: 1px solid #4da6ff;
+            border-radius: 6px;
+            color: #4da6ff;
+            padding: 8px 12px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            z-index: 50;
+            font-family: 'Share Tech Mono', monospace;
+        }
+        .reset-btn:hover { background: rgba(77, 166, 255, 0.2); }
+        .legend {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .legend-item {
+            background: rgba(30, 90, 150, 0.15);
+            border: 1px solid #1e5a96;
+            border-radius: 8px;
+            padding: 10px 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+        .legend-item:hover {
+            background: rgba(30, 90, 150, 0.3);
+            border-color: #4da6ff;
+        }
+        .legend-item.active {
+            background: rgba(77, 166, 255, 0.2);
+            border-color: #4da6ff;
+        }
+        .legend-item span {
+            font-family: 'Share Tech Mono', monospace;
+            color: #7ab8ed;
+            font-size: 0.8rem;
+        }
+        .info-panel {
+            background: rgba(10, 22, 40, 0.9);
+            border: 2px solid #1e5a96;
+            border-radius: 12px;
+            padding: 20px;
+            display: none;
+            max-height: 450px;
+            overflow-y: auto;
+        }
+        .info-panel.active { display: block; }
+        .info-panel h2 {
+            font-family: 'Share Tech Mono', monospace;
+            color: #4da6ff;
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+        }
+        .info-section { margin-bottom: 15px; }
+        .info-section h3 {
+            color: #4da6ff;
+            font-size: 1rem;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .info-section h3::before {
+            content: '';
+            width: 4px;
+            height: 16px;
+            background: #4da6ff;
+            border-radius: 2px;
+        }
+        .info-section p { color: #c0d8f0; line-height: 1.6; font-size: 0.95rem; }
+        .info-section ul { list-style: none; padding: 0; }
+        .info-section ul li {
+            color: #c0d8f0;
+            padding: 6px 0;
+            padding-left: 18px;
+            position: relative;
+            font-size: 0.9rem;
+        }
+        .info-section ul li::before {
+            content: '▸';
+            position: absolute;
+            left: 0;
+            color: #4da6ff;
+        }
+        .hazard-section {
+            background: rgba(255, 77, 77, 0.1);
+            border: 1px solid #ff4d4d;
+            border-radius: 8px;
+            padding: 15px;
+        }
+        .hazard-section h3 { color: #ff4d4d; }
+        .hazard-section h3::before { background: #ff4d4d; }
+        .hazard-section ul li::before { color: #ff4d4d; }
+        .close-info {
+            background: none;
+            border: 1px solid #4da6ff;
+            color: #4da6ff;
+            padding: 8px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 0.9rem;
+            margin-top: 15px;
+            transition: all 0.3s ease;
+        }
+        .close-info:hover { background: #4da6ff; color: #0a1628; }
+        .credit {
+            text-align: center;
+            padding: 15px;
+            border-top: 1px solid #1e5a96;
+            margin-top: 20px;
+            font-size: 0.8rem;
+            color: #5a8bb8;
+        }
+        .credit a { color: #4da6ff; text-decoration: none; }
+        .file-upload {
+            background: rgba(30, 90, 150, 0.15);
+            border: 2px dashed #1e5a96;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .file-upload:hover {
+            border-color: #4da6ff;
+            background: rgba(30, 90, 150, 0.25);
+        }
+        .file-upload.hidden { display: none; }
+        .file-upload input { display: none; }
+        .file-upload p { color: #7ab8ed; margin-bottom: 10px; }
+        .file-upload .btn {
+            background: #4da6ff;
+            color: #0a1628;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 600;
+        }
+        @media (max-width: 768px) {
+            .viewer-container { height: 350px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>🛞 3D Landing Gear Module</h1>
+            <p>Interactive Hazard Identification System</p>
+            <div class="aircraft-badge">AIRCRAFT LANDING GEAR</div>
+        </header>
+
+        <div class="file-upload" id="fileUpload">
+            <p>To view the 3D model, please select the GLB file:</p>
+            <label class="btn">
+                Select landing_gear.glb
+                <input type="file" id="modelFile" accept=".glb,.gltf">
+            </label>
+            <p style="margin-top: 10px; font-size: 0.8rem; color: #5a8bb8;">Or upload to GitHub Pages for automatic loading</p>
+        </div>
+
+        <div class="instructions">
+            <p>Explore the 3D model by rotating, zooming, and clicking on parts to learn about hazards.</p>
+            <div class="controls-hint">
+                <div class="hint-item"><div class="hint-icon">👆</div><span>Drag to rotate</span></div>
+                <div class="hint-item"><div class="hint-icon">🔍</div><span>Pinch/Scroll zoom</span></div>
+                <div class="hint-item"><div class="hint-icon">👇</div><span>Click for info</span></div>
+            </div>
+        </div>
+
+        <div class="viewer-container">
+            <canvas id="canvas3d"></canvas>
+            <div class="loading" id="loading">
+                <div class="loading-spinner"></div>
+                <p>Waiting for model...</p>
+            </div>
+            <div class="part-label-3d" id="hoverLabel"><h4>Part Name</h4><p>Click for details</p></div>
+            <div class="zoom-controls">
+                <button class="zoom-btn" id="zoomIn">+</button>
+                <button class="zoom-btn" id="zoomOut">−</button>
+            </div>
+            <button class="reset-btn" id="resetView">↺ Reset View</button>
+        </div>
+
+        <div class="legend">
+            <div class="legend-item" data-part="strut" onclick="showInfo('strut')"><span>01 — OLEO STRUT</span></div>
+            <div class="legend-item" data-part="wheel" onclick="showInfo('wheel')"><span>02 — WHEEL ASSEMBLY</span></div>
+            <div class="legend-item" data-part="tire" onclick="showInfo('tire')"><span>03 — TIRE</span></div>
+            <div class="legend-item" data-part="brake" onclick="showInfo('brake')"><span>04 — BRAKE SYSTEM</span></div>
+            <div class="legend-item" data-part="actuator" onclick="showInfo('actuator')"><span>05 — ACTUATOR</span></div>
+            <div class="legend-item" data-part="linkage" onclick="showInfo('linkage')"><span>06 — LINKAGE</span></div>
+        </div>
+
+        <div class="info-panel" id="infoPanel">
+            <h2 id="infoTitle">Part Name</h2>
+            <div class="info-section"><h3>Description</h3><p id="infoDescription"></p></div>
+            <div class="info-section"><h3>Components</h3><ul id="infoComponents"></ul></div>
+            <div class="info-section hazard-section"><h3>⚠ Safety Hazards</h3><ul id="infoHazards"></ul></div>
+            <button class="close-info" onclick="closeInfo()">Close</button>
+        </div>
+
+        <div class="credit">
+            <p>3D Model: <a href="https://sketchfab.com/3d-models/landing-gear-c46a2d86dc6e41c98db7b004337247a6" target="_blank">"Landing Gear"</a> by Victor Garrido, licensed under CC Attribution</p>
+            <p>BSAMT Thesis Project — National Aviation Academy of the Philippines</p>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script>
+        const partsData = {
+            strut: {
+                title: "Oleo Strut Assembly",
+                description: "The oleo strut is a pneumatic/hydraulic shock absorber that cushions landing impact and supports the aircraft weight. It contains compressed nitrogen gas and hydraulic fluid in a telescoping cylinder design.",
+                components: ["Outer cylinder (barrel)", "Inner piston", "Metering pin", "Orifice plate", "Nitrogen charging valve", "Hydraulic fluid reservoir", "Seals and O-rings", "Torque links (scissors)"],
+                hazards: ["HIGH PRESSURE — Contains nitrogen at 1,500-3,000 PSI. Never loosen fittings without depressurizing first.", "STORED ENERGY — Compressed strut can extend forcefully. Keep body clear when servicing.", "HYDRAULIC FLUID — MIL-PRF-5606 fluid is flammable and toxic. Wear gloves and eye protection.", "CRUSH HAZARD — Never position body under strut. Always use jack stands as backup.", "SEAL FAILURE — Leaking seals indicate service needed. Do not operate with visible leaks."]
+            },
+            wheel: {
+                title: "Wheel Assembly",
+                description: "Aircraft wheels are typically split-rim design made from forged aluminum or magnesium alloy. They are precision-engineered to handle high loads during landing while remaining lightweight.",
+                components: ["Wheel halves (inboard/outboard)", "Wheel tie bolts", "Wheel bearings (tapered roller)", "Bearing cups and cones", "Grease seal/felt seal", "Hubcap", "Valve stem"],
+                hazards: ["WHEEL SEPARATION — Improper torque on tie bolts can cause wheel halves to separate during operation.", "BEARING FAILURE — Worn or contaminated bearings can seize, causing wheel lockup or fire.", "MAGNESIUM FIRE — Magnesium wheels burn intensely if ignited. Use proper fire extinguishing agents.", "PINCH POINTS — Keep fingers clear when assembling wheel halves.", "HEAVY COMPONENTS — Wheels are heavy. Use proper lifting techniques."]
+            },
+            tire: {
+                title: "Aircraft Tire",
+                description: "Aircraft tires are designed for high-speed operation and heavy loads. They use bias-ply or radial construction with multiple reinforcing plies and are typically filled with nitrogen to prevent moisture and reduce fire risk.",
+                components: ["Tread surface", "Sidewall", "Bead area", "Reinforcing plies (nylon/aramid)", "Inner liner", "Tube (if tube-type)", "Valve stem"],
+                hazards: ["EXPLOSIVE FAILURE — Over-inflated or damaged tires can explode with fatal force. NEVER exceed rated pressure.", "NITROGEN ONLY — Use dry nitrogen for inflation. Air contains moisture that can cause pressure variations.", "HOT TIRE DANGER — Tires become extremely hot after landing. Allow cooling before inspection.", "BEAD SEPARATION — Improper mounting can cause bead to unseat explosively.", "FOD DAMAGE — Inspect for cuts, bulges, and foreign object damage before each flight."]
+            },
+            brake: {
+                title: "Brake System",
+                description: "Aircraft brakes are typically multiple-disc design using carbon or steel rotors and stators. They are hydraulically operated and must dissipate enormous heat energy during landing and rejected takeoffs.",
+                components: ["Brake housing/caliper", "Rotor discs (rotating)", "Stator discs (stationary)", "Brake pads/linings", "Hydraulic pistons", "Brake wear indicator", "Anti-skid components"],
+                hazards: ["EXTREME HEAT — Brake temperatures can exceed 1,000°F after heavy braking. NEVER touch after landing.", "BRAKE FIRE — Overheated brakes can ignite wheel and tire. Know fire procedures.", "HYDRAULIC FLUID — Brake fluid is flammable. Keep away from hot brakes.", "ASBESTOS — Older brake pads may contain asbestos. Use respiratory protection.", "CARBON DUST — Carbon brake dust is an irritant. Work in ventilated area."]
+            },
+            actuator: {
+                title: "Retraction Actuator",
+                description: "The landing gear actuator is a hydraulic cylinder that extends and retracts the landing gear. It must be capable of lowering the gear even with hydraulic failure (free-fall or emergency extension).",
+                components: ["Actuator cylinder", "Piston rod", "Hydraulic ports", "Position sensors", "Locking mechanism", "Emergency release"],
+                hazards: ["HYDRAULIC PRESSURE — System operates at 3,000 PSI. Depressurize before maintenance.", "UNEXPECTED MOVEMENT — Gear can retract/extend unexpectedly. Use gear pins/locks.", "CRUSH HAZARD — Moving gear can crush personnel. Establish clear zone during testing.", "FLUID INJECTION — High-pressure hydraulic leaks can penetrate skin. Seek immediate medical attention.", "STORED ENERGY — Some systems have nitrogen backup. Follow proper procedures."]
+            },
+            linkage: {
+                title: "Gear Linkage & Hardware",
+                description: "The landing gear linkage includes all connecting rods, hinges, and hardware that allow the gear to retract, extend, and lock in position. These components are flight-critical and require regular inspection.",
+                components: ["Drag strut/brace", "Side strut", "Downlock mechanism", "Uplock mechanism", "Pivot bolts", "Bushings and bearings", "Safety pins"],
+                hazards: ["CRITICAL HARDWARE — Loose or missing hardware can cause gear collapse. Torque and safety all bolts.", "CORROSION — Linkage joints trap moisture. Inspect for corrosion and proper lubrication.", "PINCH POINTS — Multiple moving joints create pinch hazards. Keep clear during operation.", "LOCK FAILURE — Downlock failure allows gear to collapse on ground. Verify locked indication.", "FATIGUE CRACKS — High-stress components prone to cracking. Use NDT inspection methods."]
+            }
+        };
+
+        let scene, camera, renderer, model;
+        let isRotating = false;
+        let previousMousePosition = { x: 0, y: 0 };
+        let currentRotation = { x: 0, y: 0 };
+        let cameraDistance = 5;
+        let raycaster, mouse;
+        let meshes = [];
+        let modelLoaded = false;
+
+        function init() {
+            const container = document.getElementById('canvas3d');
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0a1628);
+
+            camera = new THREE.PerspectiveCamera(45, width / height, 0.01, 1000);
+            camera.position.set(3, 2, 5);
+
+            renderer = new THREE.WebGLRenderer({ canvas: container, antialias: true });
+            renderer.setSize(width, height);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.outputEncoding = THREE.sRGBEncoding;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.5;
+
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(5, 10, 7);
+            scene.add(directionalLight);
+            const directionalLight2 = new THREE.DirectionalLight(0x4da6ff, 0.5);
+            directionalLight2.position.set(-5, 5, -5);
+            scene.add(directionalLight2);
+            const bottomLight = new THREE.DirectionalLight(0x4da6ff, 0.3);
+            bottomLight.position.set(0, -5, 0);
+            scene.add(bottomLight);
+
+            // Grid
+            const gridHelper = new THREE.GridHelper(10, 20, 0x1e5a96, 0x0d2137);
+            gridHelper.position.y = -2;
+            scene.add(gridHelper);
+
+            // Try to auto-load model from same directory (for GitHub Pages)
+            tryAutoLoad();
+
+            // File input handler
+            document.getElementById('modelFile').addEventListener('change', handleFileSelect);
+
+            // Event listeners
+            container.addEventListener('mousedown', onMouseDown);
+            container.addEventListener('mousemove', onMouseMove);
+            container.addEventListener('mouseup', onMouseUp);
+            container.addEventListener('mouseleave', onMouseUp);
+            container.addEventListener('wheel', onWheel);
+            container.addEventListener('click', onClick);
+            container.addEventListener('touchstart', onTouchStart);
+            container.addEventListener('touchmove', onTouchMove);
+            container.addEventListener('touchend', onTouchEnd);
+
+            document.getElementById('zoomIn').addEventListener('click', () => { cameraDistance = Math.max(1, cameraDistance - 0.5); updateCamera(); });
+            document.getElementById('zoomOut').addEventListener('click', () => { cameraDistance = Math.min(15, cameraDistance + 0.5); updateCamera(); });
+            document.getElementById('resetView').addEventListener('click', resetView);
+
+            window.addEventListener('resize', onResize);
+
+            animate();
+        }
+
+        function tryAutoLoad() {
+            const loader = new THREE.GLTFLoader();
+            document.querySelector('#loading p').textContent = 'Loading 3D Model...';
+            
+            loader.load(
+                'landing_gear.glb',
+                function(gltf) {
+                    processModel(gltf);
+                    document.getElementById('fileUpload').classList.add('hidden');
+                },
+                function(xhr) {
+                    if (xhr.total > 0) {
+                        const percent = (xhr.loaded / xhr.total * 100).toFixed(0);
+                        document.querySelector('#loading p').textContent = 'Loading: ' + percent + '%';
+                    }
+                },
+                function(error) {
+                    console.log('Auto-load failed, waiting for file selection');
+                    document.querySelector('#loading p').textContent = 'Select GLB file above';
+                }
+            );
+        }
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                document.querySelector('#loading p').textContent = 'Loading 3D Model...';
+                const url = URL.createObjectURL(file);
+                const loader = new THREE.GLTFLoader();
+                
+                loader.load(
+                    url,
+                    function(gltf) {
+                        processModel(gltf);
+                        document.getElementById('fileUpload').classList.add('hidden');
+                        URL.revokeObjectURL(url);
+                    },
+                    function(xhr) {
+                        if (xhr.total > 0) {
+                            const percent = (xhr.loaded / xhr.total * 100).toFixed(0);
+                            document.querySelector('#loading p').textContent = 'Loading: ' + percent + '%';
+                        }
+                    },
+                    function(error) {
+                        console.error('Error loading model:', error);
+                        document.querySelector('#loading p').textContent = 'Error loading model';
+                    }
+                );
+            }
+        }
+
+        function processModel(gltf) {
+            model = gltf.scene;
+            
+            const box = new THREE.Box3().setFromObject(model);
+            const center = box.getCenter(new THREE.Vector3());
+            const size = box.getSize(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const scale = 3 / maxDim;
+            model.scale.setScalar(scale);
+            model.position.sub(center.multiplyScalar(scale));
+
+            model.traverse((child) => {
+                if (child.isMesh) {
+                    meshes.push(child);
+                    child.userData.originalMaterial = child.material.clone();
+                    assignPartType(child);
+                }
+            });
+
+            scene.add(model);
+            document.getElementById('loading').style.display = 'none';
+            modelLoaded = true;
+            console.log('Model loaded with', meshes.length, 'meshes');
+        }
+
+        function assignPartType(mesh) {
+            const name = mesh.name.toLowerCase();
+            if (name.includes('strut') || name.includes('oleo') || name.includes('shock') || name.includes('cylinder') || name.includes('piston')) {
+                mesh.userData.partType = 'strut';
+            } else if (name.includes('wheel') || name.includes('rim') || name.includes('hub')) {
+                mesh.userData.partType = 'wheel';
+            } else if (name.includes('tire') || name.includes('tyre') || name.includes('rubber')) {
+                mesh.userData.partType = 'tire';
+            } else if (name.includes('brake') || name.includes('caliper') || name.includes('disc') || name.includes('rotor')) {
+                mesh.userData.partType = 'brake';
+            } else if (name.includes('actuator') || name.includes('hydraulic')) {
+                mesh.userData.partType = 'actuator';
+            } else if (name.includes('link') || name.includes('rod') || name.includes('arm') || name.includes('joint') || name.includes('bolt') || name.includes('screw')) {
+                mesh.userData.partType = 'linkage';
+            } else {
+                const types = ['strut', 'wheel', 'tire', 'brake', 'actuator', 'linkage'];
+                mesh.userData.partType = types[meshes.length % types.length];
+            }
+        }
+
+        function updateCamera() {
+            const x = cameraDistance * Math.sin(currentRotation.y) * Math.cos(currentRotation.x);
+            const y = cameraDistance * Math.sin(currentRotation.x) + 0.5;
+            const z = cameraDistance * Math.cos(currentRotation.y) * Math.cos(currentRotation.x);
+            camera.position.set(x, y, z);
+            camera.lookAt(0, 0, 0);
+        }
+
+        function onMouseDown(e) { isRotating = true; previousMousePosition = { x: e.clientX, y: e.clientY }; }
+        function onMouseMove(e) {
+            if (!isRotating) { if (modelLoaded) updateHover(e.clientX, e.clientY); return; }
+            const deltaX = e.clientX - previousMousePosition.x;
+            const deltaY = e.clientY - previousMousePosition.y;
+            currentRotation.y += deltaX * 0.01;
+            currentRotation.x += deltaY * 0.01;
+            currentRotation.x = Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5, currentRotation.x));
+            updateCamera();
+            previousMousePosition = { x: e.clientX, y: e.clientY };
+        }
+        function onMouseUp() { isRotating = false; }
+        function onWheel(e) { e.preventDefault(); cameraDistance += e.deltaY * 0.005; cameraDistance = Math.max(1, Math.min(15, cameraDistance)); updateCamera(); }
+
+        let touchStartDistance = 0, lastTouchPosition = { x: 0, y: 0 }, touchStartTime = 0;
+        function onTouchStart(e) {
+            touchStartTime = Date.now();
+            if (e.touches.length === 1) { isRotating = true; lastTouchPosition = { x: e.touches[0].clientX, y: e.touches[0].clientY }; }
+            else if (e.touches.length === 2) { isRotating = false; touchStartDistance = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); }
+        }
+        function onTouchMove(e) {
+            e.preventDefault();
+            if (e.touches.length === 1 && isRotating) {
+                const deltaX = e.touches[0].clientX - lastTouchPosition.x;
+                const deltaY = e.touches[0].clientY - lastTouchPosition.y;
+                currentRotation.y += deltaX * 0.01;
+                currentRotation.x += deltaY * 0.01;
+                currentRotation.x = Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5, currentRotation.x));
+                updateCamera();
+                lastTouchPosition = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            } else if (e.touches.length === 2) {
+                const currentDistance = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+                cameraDistance += (touchStartDistance - currentDistance) * 0.01;
+                cameraDistance = Math.max(1, Math.min(15, cameraDistance));
+                updateCamera();
+                touchStartDistance = currentDistance;
+            }
+        }
+        function onTouchEnd(e) {
+            if (Date.now() - touchStartTime < 200 && e.changedTouches.length === 1 && modelLoaded) {
+                handleClick(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+            }
+            isRotating = false;
+        }
+
+        function updateHover(clientX, clientY) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(meshes, true);
+            const label = document.getElementById('hoverLabel');
+            meshes.forEach(mesh => { if (mesh.userData.originalMaterial) mesh.material = mesh.userData.originalMaterial.clone(); });
+            if (intersects.length > 0) {
+                const mesh = intersects[0].object;
+                const partType = mesh.userData.partType;
+                if (partType && partsData[partType]) {
+                    mesh.material = mesh.material.clone();
+                    mesh.material.emissive = new THREE.Color(0x4da6ff);
+                    mesh.material.emissiveIntensity = 0.3;
+                    label.querySelector('h4').textContent = partsData[partType].title;
+                    label.querySelector('p').textContent = 'Click for details';
+                    label.style.display = 'block';
+                    label.style.left = (clientX - rect.left + 15) + 'px';
+                    label.style.top = (clientY - rect.top + 15) + 'px';
+                    renderer.domElement.style.cursor = 'pointer';
+                    return;
+                }
+            }
+            label.style.display = 'none';
+            renderer.domElement.style.cursor = 'grab';
+        }
+
+        function onClick(e) { if (modelLoaded) handleClick(e.clientX, e.clientY); }
+        function handleClick(clientX, clientY) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(meshes, true);
+            if (intersects.length > 0) {
+                const partType = intersects[0].object.userData.partType;
+                if (partType && partsData[partType]) showInfo(partType);
+            }
+        }
+
+        function showInfo(partName) {
+            const data = partsData[partName];
+            if (!data) return;
+            document.getElementById('infoTitle').textContent = data.title;
+            document.getElementById('infoDescription').textContent = data.description;
+            document.getElementById('infoComponents').innerHTML = data.components.map(c => '<li>' + c + '</li>').join('');
+            document.getElementById('infoHazards').innerHTML = data.hazards.map(h => '<li>' + h + '</li>').join('');
+            document.getElementById('infoPanel').classList.add('active');
+            document.querySelectorAll('.legend-item').forEach(item => { item.classList.remove('active'); if (item.dataset.part === partName) item.classList.add('active'); });
+        }
+
+        function closeInfo() {
+            document.getElementById('infoPanel').classList.remove('active');
+            document.querySelectorAll('.legend-item').forEach(item => item.classList.remove('active'));
+        }
+
+        function resetView() { currentRotation = { x: 0.3, y: 0.8 }; cameraDistance = 5; updateCamera(); }
+        function onResize() {
+            const container = document.getElementById('canvas3d');
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+        function animate() { requestAnimationFrame(animate); renderer.render(scene, camera); }
+
+        init();
+        resetView();
+    </script>
+</body>
+</html>
